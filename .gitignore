@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Environment variables
+.env
+
+# Data / local files
+data/*.csv
+data/*.json
+data/*.parquet
+
+# OS / editor
+.DS_Store
+.vscode/
+
+# LangGraph / local database files
+*.sqlite
+*.sqlite3
+*.db
