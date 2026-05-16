@@ -20,6 +20,14 @@ def download_dataset() -> pd.DataFrame:
     return df
 
 
+def load_dataset_from_csv() -> pd.DataFrame:
+    """Load the dataset from a local CSV file if it exists, otherwise download it."""
+    if DATA_FILE.exists():
+        return pd.read_csv(DATA_FILE)
+
+    return download_dataset()
+
+
 def print_dataset_summary(df: pd.DataFrame) -> None:
     """Print basic information about the dataset."""
     print("Dataset loaded successfully!")
@@ -32,5 +40,5 @@ def print_dataset_summary(df: pd.DataFrame) -> None:
 
 
 if __name__ == "__main__":
-    dataframe = download_dataset()
+    dataframe = load_dataset_from_csv()
     print_dataset_summary(dataframe)
