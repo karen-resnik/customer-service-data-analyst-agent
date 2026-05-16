@@ -8,9 +8,14 @@ def get_dataset() -> pd.DataFrame:
     return load_dataset_from_csv()
 
 
-def normalize_text(value: str) -> str:
-    """Normalize user-provided text for case-insensitive matching."""
+def normalize_category(value: str) -> str:
+    """Normalize a user-provided category for case-insensitive matching."""
     return value.strip().upper()
+
+
+def normalize_intent(value: str) -> str:
+    """Normalize a user-provided intent for case-insensitive matching."""
+    return value.strip().lower()
 
 
 def list_categories() -> list[str]:
@@ -25,12 +30,40 @@ def list_intents() -> list[str]:
     return sorted(df["intent"].unique().tolist())
 
 
+def validate_category(category: str) -> str:
+    """Return a normalized category, or raise ValueError if it does not exist."""
+    normalized_category = normalize_category(category)
+    valid_categories = list_categories()
+
+    if normalized_category not in valid_categories:
+        raise ValueError(
+            f"Unknown category '{category}'. "
+            f"Valid categories are: {', '.join(valid_categories)}."
+        )
+
+    return normalized_category
+
+
+def validate_intent(intent: str) -> str:
+    """Return a normalized intent, or raise ValueError if it does not exist."""
+    normalized_intent = normalize_intent(intent)
+    valid_intents = list_intents()
+
+    if normalized_intent not in valid_intents:
+        raise ValueError(
+            f"Unknown intent '{intent}'. "
+            f"Valid intents are: {', '.join(valid_intents)}."
+        )
+
+    return normalized_intent
+
+
 def get_intents_by_category(category: str) -> list[str]:
     """Return all intents that belong to a specific category."""
     df = get_dataset()
-    normalized_category = normalize_text(category)
+    valid_category = validate_category(category)
 
-    filtered_df = df[df["category"] == normalized_category]
+    filtered_df = df[df["category"] == valid_category]
     return sorted(filtered_df["intent"].unique().tolist())
 
 
@@ -42,10 +75,12 @@ def filter_dataset(
     df = get_dataset()
 
     if category is not None:
-        df = df[df["category"] == normalize_text(category)]
+        valid_category = validate_category(category)
+        df = df[df["category"] == valid_category]
 
     if intent is not None:
-        df = df[df["intent"] == intent.strip().lower()]
+        valid_intent = validate_intent(intent)
+        df = df[df["intent"] == valid_intent]
 
     return df
 
@@ -79,3 +114,24 @@ def get_intent_distribution(category: str) -> dict[str, int]:
 
     distribution = filtered_df["intent"].value_counts().to_dict()
     return {intent: int(count) for intent, count in distribution.items()}
+
+
+def search_examples(query: str, n: int = 5) -> list[dict[str, Any]]:
+    """Search customer instructions and responses for a keyword or phrase."""
+    df = get_dataset()
+    normalized_query = query.strip().lower()
+
+    if not normalized_query:
+        raise ValueError("Search query cannot be empty.")
+
+    mask = (
+        df["instruction"].str.lower().str.contains(normalized_query, regex=False)
+        | df["response"].str.lower().str.contains(normalized_query, regex=False)
+        | df["category"].str.lower().str.contains(normalized_query, regex=False)
+        | df["intent"].str.lower().str.contains(normalized_query, regex=False)
+    )
+
+    sample_columns = ["instruction", "category", "intent", "response"]
+    examples = df.loc[mask, sample_columns].head(n)
+
+    return examples.to_dict(orient="records")
