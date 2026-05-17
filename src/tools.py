@@ -153,6 +153,12 @@ def filter_dataset(
 
     return df
 
+def get_sample_records(df: pd.DataFrame, n: int = 5) -> list[dict[str, Any]]:
+    """Return compact sample records from a DataFrame."""
+    sample_columns = ["instruction", "category", "intent", "response"]
+    sample_df = df[sample_columns].head(n)
+    return sample_df.to_dict(orient="records")
+
 
 def count_rows(
     category: str | None = None,
@@ -170,11 +176,7 @@ def show_examples(
 ) -> list[dict[str, Any]]:
     """Return example customer instructions and responses from the dataset."""
     filtered_df = filter_dataset(category=category, intent=intent)
-
-    sample_columns = ["instruction", "category", "intent", "response"]
-    examples = filtered_df[sample_columns].head(n)
-
-    return examples.to_dict(orient="records")
+    return get_sample_records(filtered_df, n=n)
 
 
 def get_intent_distribution(category: str) -> dict[str, int]:
@@ -204,3 +206,36 @@ def search_examples(query: str, n: int = 5) -> list[dict[str, Any]]:
     examples = df.loc[mask, sample_columns].head(n)
 
     return examples.to_dict(orient="records")
+
+
+def get_category_overview(category: str) -> dict[str, Any]:
+    """Return a compact overview of a category for summarization or analysis."""
+    valid_category = validate_category(category)
+    filtered_df = filter_dataset(category=valid_category)
+
+    intent_distribution = filtered_df["intent"].value_counts().to_dict()
+
+    return {
+        "category": valid_category,
+        "row_count": len(filtered_df),
+        "intents": sorted(filtered_df["intent"].unique().tolist()),
+        "intent_distribution": {
+            intent: int(count) for intent, count in intent_distribution.items()
+        },
+        "sample_records": get_sample_records(filtered_df, n=5),
+    }
+
+
+def get_intent_overview(intent: str) -> dict[str, Any]:
+    """Return a compact overview of an intent for summarization or analysis."""
+    valid_intent = validate_intent(intent)
+    filtered_df = filter_dataset(intent=valid_intent)
+
+    category_values = sorted(filtered_df["category"].unique().tolist())
+
+    return {
+        "intent": valid_intent,
+        "categories": category_values,
+        "row_count": len(filtered_df),
+        "sample_records": get_sample_records(filtered_df, n=5),
+    }
