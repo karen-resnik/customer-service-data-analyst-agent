@@ -1,5 +1,6 @@
 from typing import Any
 import pandas as pd
+from langchain_core.tools import StructuredTool
 from pydantic import BaseModel, Field
 from src.data_loader import load_dataset_from_csv
 
@@ -239,3 +240,92 @@ def get_intent_overview(intent: str) -> dict[str, Any]:
         "row_count": len(filtered_df),
         "sample_records": get_sample_records(filtered_df, n=5),
     }
+
+
+DATASET_TOOLS = [
+    StructuredTool.from_function(
+        func=list_categories,
+        name="list_categories",
+        description=(
+            "List all high-level customer service categories in the dataset. "
+            "Use this when the user asks what categories exist."
+        ),
+        args_schema=EmptyInput,
+    ),
+    StructuredTool.from_function(
+        func=list_intents,
+        name="list_intents",
+        description=(
+            "List all specific customer service intents in the dataset. "
+            "Use this when the user asks what intents exist."
+        ),
+        args_schema=EmptyInput,
+    ),
+    StructuredTool.from_function(
+        func=get_intents_by_category,
+        name="get_intents_by_category",
+        description=(
+            "Return the intents that belong to a specific category. "
+            "Use this when the user asks what intents are included in a category."
+        ),
+        args_schema=CategoryInput,
+    ),
+    StructuredTool.from_function(
+        func=count_rows,
+        name="count_rows",
+        description=(
+            "Count dataset rows, optionally filtered by category and/or intent. "
+            "Use this for questions like 'How many refund requests are there?' "
+            "or 'How many complaint examples are in the dataset?'"
+        ),
+        args_schema=CountRowsInput,
+    ),
+    StructuredTool.from_function(
+        func=show_examples,
+        name="show_examples",
+        description=(
+            "Show example customer instructions and agent responses, optionally filtered "
+            "by category and/or intent. Use this when the user asks for examples from "
+            "a known category or intent."
+        ),
+        args_schema=ShowExamplesInput,
+    ),
+    StructuredTool.from_function(
+        func=get_intent_distribution,
+        name="get_intent_distribution",
+        description=(
+            "Return the distribution of intents inside a specific category. "
+            "Use this when the user asks for intent distribution within a category."
+        ),
+        args_schema=CategoryInput,
+    ),
+    StructuredTool.from_function(
+        func=search_examples,
+        name="search_examples",
+        description=(
+            "Search for examples using a keyword or phrase across customer instructions, "
+            "responses, categories, and intents. Use this when the user describes an idea "
+            "in natural language instead of naming an exact category or intent."
+        ),
+        args_schema=SearchExamplesInput,
+    ),
+    StructuredTool.from_function(
+        func=get_category_overview,
+        name="get_category_overview",
+        description=(
+            "Return a compact overview of a category, including row count, intents, "
+            "intent distribution, and sample records. Use this for summarizing or "
+            "analyzing a whole category."
+        ),
+        args_schema=CategoryInput,
+    ),
+    StructuredTool.from_function(
+        func=get_intent_overview,
+        name="get_intent_overview",
+        description=(
+            "Return a compact overview of an intent, including row count, category, "
+            "and sample records. Use this for summarizing or analyzing a specific intent."
+        ),
+        args_schema=IntentInput,
+    ),
+]
