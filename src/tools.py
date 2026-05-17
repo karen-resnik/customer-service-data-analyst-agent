@@ -1,7 +1,76 @@
 from typing import Any
 import pandas as pd
+from pydantic import BaseModel, Field
 from src.data_loader import load_dataset_from_csv
 
+class EmptyInput(BaseModel):
+    """Input schema for tools that do not require parameters."""
+
+
+class CategoryInput(BaseModel):
+    """Input schema for tools that require a dataset category."""
+
+    category: str = Field(
+        ...,
+        description="Dataset category, for example REFUND, ACCOUNT, SHIPPING, or FEEDBACK.",
+    )
+
+
+class IntentInput(BaseModel):
+    """Input schema for tools that require a dataset intent."""
+
+    intent: str = Field(
+        ...,
+        description="Dataset intent, for example get_refund, cancel_order, or complaint.",
+    )
+
+
+class CountRowsInput(BaseModel):
+    """Input schema for counting rows with optional filters."""
+
+    category: str | None = Field(
+        default=None,
+        description="Optional dataset category filter, for example REFUND or ACCOUNT.",
+    )
+    intent: str | None = Field(
+        default=None,
+        description="Optional dataset intent filter, for example get_refund or complaint.",
+    )
+
+
+class ShowExamplesInput(BaseModel):
+    """Input schema for showing examples from the dataset."""
+
+    category: str | None = Field(
+        default=None,
+        description="Optional dataset category filter, for example SHIPPING or REFUND.",
+    )
+    intent: str | None = Field(
+        default=None,
+        description="Optional dataset intent filter, for example get_refund or change_shipping_address.",
+    )
+    n: int = Field(
+        default=3,
+        ge=1,
+        le=10,
+        description="Number of examples to return. Must be between 1 and 10.",
+    )
+
+
+class SearchExamplesInput(BaseModel):
+    """Input schema for searching examples by keyword or phrase."""
+
+    query: str = Field(
+        ...,
+        min_length=1,
+        description="Keyword or phrase to search for in instructions, responses, categories, or intents.",
+    )
+    n: int = Field(
+        default=5,
+        ge=1,
+        le=10,
+        description="Number of matching examples to return. Must be between 1 and 10.",
+    )
 
 def get_dataset() -> pd.DataFrame:
     """Load and return the Bitext customer support dataset."""
