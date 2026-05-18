@@ -73,6 +73,22 @@ class SearchExamplesInput(BaseModel):
         description="Number of matching examples to return. Must be between 1 and 10.",
     )
 
+class SearchPlan(BaseModel):
+    """Internal search plan for natural-language example search."""
+
+    text_terms: list[str] = Field(
+        default_factory=list,
+        description="Expanded keyword and phrase search terms.",
+    )
+    preferred_category: str | None = Field(
+        default=None,
+        description="Optional category to prioritize in search results.",
+    )
+    preferred_intents: list[str] = Field(
+        default_factory=list,
+        description="Optional intents to prioritize in search results.",
+    )
+
 def get_dataset() -> pd.DataFrame:
     """Load and return the Bitext customer support dataset."""
     return load_dataset_from_csv()
@@ -204,26 +220,267 @@ def get_intent_distribution(category: str) -> dict[str, int]:
     distribution = filtered_df["intent"].value_counts().to_dict()
     return {intent: int(count) for intent, count in distribution.items()}
 
+def build_search_plan(query: str) -> SearchPlan:
+    """Build a search plan from a natural-language query.
+
+    Text terms are natural-language phrases only.
+    Dataset labels are represented separately as preferred category and intents.
+    """
+    normalized_query = query.strip().lower()
+
+    text_terms = {normalized_query}
+    preferred_category: str | None = None
+    preferred_intents: list[str] = []
+
+    # Refund-related broad search
+    if any(
+        phrase in normalized_query
+        for phrase in {
+            "refund",
+            "refunded",
+            "money back",
+            "compensation",
+            "reimbursement",
+        }
+    ):
+        preferred_category = "REFUND"
+        text_terms.update(
+            {
+                "refund",
+                "money back",
+                "compensation",
+                "reimbursement",
+            }
+        )
+
+    # Refund-related specific intents
+    if any(
+        phrase in normalized_query
+        for phrase in {
+            "refund policy",
+            "money back policy",
+            "refund rules",
+            "refund conditions",
+            "am i eligible for a refund",
+            "eligible for refund",
+        }
+    ):
+        preferred_category = "REFUND"
+        preferred_intents.append("check_refund_policy")
+        text_terms.update(
+            {
+                "refund policy",
+                "money back policy",
+                "eligible for refund",
+            }
+        )
+
+    if any(
+        phrase in normalized_query
+        for phrase in {
+            "track refund",
+            "refund status",
+            "where is my refund",
+            "status of my refund",
+            "refund progress",
+        }
+    ):
+        preferred_category = "REFUND"
+        preferred_intents.append("track_refund")
+        text_terms.update(
+            {
+                "track refund",
+                "refund status",
+                "where is my refund",
+            }
+        )
+
+    if any(
+        phrase in normalized_query
+        for phrase in {
+            "get refund",
+            "request refund",
+            "want refund",
+            "want a refund",
+            "want my money back",
+            "want money back",
+            "get my money back",
+            "get money back",
+            "need my money back",
+            "ask for my money back",
+            "compensation",
+            "reimbursement",
+            "wanting their money back",
+            "money back",
+        }
+    ):
+        preferred_category = "REFUND"
+        preferred_intents.append("get_refund")
+        text_terms.update(
+            {
+                "get refund",
+                "request refund",
+                "money back",
+                "compensation",
+                "reimbursement",
+            }
+        )
+
+    # Complaint / feedback
+    if any(
+        phrase in normalized_query
+        for phrase in {
+            "complaint",
+            "complain",
+            "claim",
+            "dissatisfied",
+            "unhappy",
+            "not happy",
+        }
+    ):
+        preferred_category = "FEEDBACK"
+        text_terms.update(
+            {
+                "complaint",
+                "claim",
+                "dissatisfied",
+                "unhappy",
+                "not happy",
+            }
+        )
+
+    if any(
+        phrase in normalized_query
+        for phrase in {
+            "complaint",
+            "complain",
+            "consumer claim",
+            "file a claim",
+            "make a claim",
+        }
+    ):
+        preferred_category = "FEEDBACK"
+        preferred_intents.append("complaint")
+        text_terms.update(
+            {
+                "complaint",
+                "claim",
+                "file a claim",
+            }
+        )
+
+    # Cancellation
+    if any(
+        phrase in normalized_query
+        for phrase in {
+            "cancel",
+            "cancellation",
+            "cancelling",
+        }
+    ):
+        text_terms.update(
+            {
+                "cancel",
+                "cancellation",
+                "cancelling",
+            }
+        )
+
+    if "cancellation fee" in normalized_query:
+        preferred_category = "CANCEL"
+        preferred_intents.append("check_cancellation_fee")
+        text_terms.update(
+            {
+                "cancellation fee",
+                "fee",
+            }
+        )
+
+    if any(
+        phrase in normalized_query
+        for phrase in {
+            "cancel order",
+            "cancel my order",
+            "cancelling order",
+            "cancel purchase",
+            "cancel my purchase",
+        }
+    ):
+        preferred_category = "ORDER"
+        preferred_intents.append("cancel_order")
+        text_terms.update(
+            {
+                "cancel order",
+                "cancel purchase",
+            }
+        )
+
+    # Shipping address
+    if any(
+        phrase in normalized_query
+        for phrase in {
+            "shipping address",
+            "delivery address",
+            "change address",
+            "update address",
+        }
+    ):
+        preferred_category = "SHIPPING"
+        text_terms.update(
+            {
+                "shipping address",
+                "delivery address",
+                "change address",
+                "update address",
+            }
+        )
+
+    return SearchPlan(
+        text_terms=sorted(text_terms),
+        preferred_category=preferred_category,
+        preferred_intents=sorted(set(preferred_intents)),
+    )
+
 
 def search_examples(query: str, n: int = 5) -> list[dict[str, Any]]:
-    """Search customer instructions and responses for a keyword or phrase."""
+    """Search examples using natural-language terms and dataset label hints."""
     df = get_dataset()
     normalized_query = query.strip().lower()
 
     if not normalized_query:
         raise ValueError("Search query cannot be empty.")
 
-    mask = (
-        df["instruction"].str.lower().str.contains(normalized_query, regex=False)
-        | df["response"].str.lower().str.contains(normalized_query, regex=False)
-        | df["category"].str.lower().str.contains(normalized_query, regex=False)
-        | df["intent"].str.lower().str.contains(normalized_query, regex=False)
-    )
-
+    search_plan = build_search_plan(normalized_query)
     sample_columns = ["instruction", "category", "intent", "response"]
-    examples = df.loc[mask, sample_columns].head(n)
 
-    return examples.to_dict(orient="records")
+    result_parts: list[pd.DataFrame] = []
+
+    # Most specific matches first: exact intent hints.
+    if search_plan.preferred_intents:
+        intent_matches = df[df["intent"].isin(search_plan.preferred_intents)]
+        result_parts.append(intent_matches)
+
+    # Then broader category matches.
+    if search_plan.preferred_category:
+        category_matches = df[df["category"] == search_plan.preferred_category]
+        result_parts.append(category_matches)
+
+    # Then natural-language text matches in instruction/response only.
+    keyword_mask = pd.Series(False, index=df.index)
+
+    for term in search_plan.text_terms:
+        term_mask = (
+            df["instruction"].str.lower().str.contains(term, regex=False)
+            | df["response"].str.lower().str.contains(term, regex=False)
+        )
+        keyword_mask = keyword_mask | term_mask
+
+    result_parts.append(df.loc[keyword_mask])
+
+    matched_df = pd.concat(result_parts)
+    matched_df = matched_df.drop_duplicates().head(n)
+
+    return matched_df[sample_columns].to_dict(orient="records")
 
 
 def get_category_overview(category: str) -> dict[str, Any]:
@@ -330,9 +587,11 @@ DATASET_TOOLS = [
         func=search_examples,
         name="search_examples",
         description=(
-            "Search for examples using a keyword or phrase across customer instructions, "
-            "responses, categories, and intents. Use this when the user describes an idea "
-            "in natural language instead of naming an exact category or intent."
+            "Search for example customer instructions and agent responses using a natural-language "
+            "keyword or phrase. This tool expands common phrases such as money back, complaint, "
+            "cancellation, or shipping address into relevant dataset categories or intents internally. "
+            "Use this when the user describes an idea in natural language instead of naming an exact "
+            "category or intent."
         ),
         args_schema=SearchExamplesInput,
     ),
