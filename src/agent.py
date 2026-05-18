@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 from langchain_core.messages import HumanMessage
 from langchain_openai import ChatOpenAI
 from langgraph.prebuilt import create_react_agent
-
+from src.router import QueryType, route_query
 from src.tools import DATASET_TOOLS
 
 
@@ -82,3 +82,16 @@ def run_agent_once(question: str) -> str:
 
     final_message = result["messages"][-1]
     return str(final_message.content)
+
+
+def answer_question(question: str) -> str:
+    """Route a question and answer it with the agent when it is in scope."""
+    route_result = route_query(question)
+
+    if route_result.query_type == QueryType.OUT_OF_SCOPE:
+        return (
+            "I can only answer questions about the Bitext customer service dataset. "
+            f"Router reason: {route_result.reason}"
+        )
+
+    return run_agent_once(question)
