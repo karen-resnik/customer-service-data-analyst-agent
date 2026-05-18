@@ -2,7 +2,7 @@ import os
 from typing import Any
 
 from dotenv import load_dotenv
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from langchain_openai import ChatOpenAI
 from langgraph.prebuilt import create_react_agent
 from src.router import QueryType, route_query
@@ -83,6 +83,43 @@ def run_agent_once(question: str) -> str:
     final_message = result["messages"][-1]
     return str(final_message.content)
 
+def run_agent_with_trace(question: str) -> tuple[str, list[str]]:
+    """Run the agent and return the final answer plus tool-call trace steps."""
+    agent = create_agent()
+    trace_steps: list[str] = []
+    final_answer = ""
+
+    for step in agent.stream(
+        {
+            "messages": [
+                HumanMessage(content=question),
+            ]
+        },
+        config={
+            "recursion_limit": 10,
+        },
+        stream_mode="values",
+    ):
+        latest_message = step["messages"][-1]
+
+        if isinstance(latest_message, AIMessage):
+            if latest_message.tool_calls:
+                for tool_call in latest_message.tool_calls:
+                    trace_steps.append(
+                        f"Tool call: {tool_call['name']}\n"
+                        f"Tool args: {tool_call['args']}"
+                    )
+            elif latest_message.content:
+                final_answer = str(latest_message.content)
+
+        elif isinstance(latest_message, ToolMessage):
+            trace_steps.append(
+                f"Tool result from {latest_message.name}:\n"
+                f"{latest_message.content}"
+            )
+
+    return final_answer, trace_steps
+
 
 def answer_question(question: str) -> str:
     """Route a question and answer it with the agent when it is in scope."""
@@ -95,3 +132,24 @@ def answer_question(question: str) -> str:
         )
 
     return run_agent_once(question)
+
+
+def answer_question_with_trace(question: str) -> tuple[str, list[str]]:
+    """Route a question and answer it, returning the final answer and trace steps."""
+    route_result = route_query(question)
+
+    trace_steps = [
+        f"Router decision: {route_result.query_type.value}",
+        f"Router reason: {route_result.reason}",
+    ]
+
+    if route_result.query_type == QueryType.OUT_OF_SCOPE:
+        answer = (
+            "I can only answer questions about the Bitext customer service dataset."
+        )
+        return answer, trace_steps
+
+    answer, agent_trace_steps = run_agent_with_trace(question)
+    trace_steps.extend(agent_trace_steps)
+
+    return answer, trace_steps

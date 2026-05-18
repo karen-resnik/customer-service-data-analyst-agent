@@ -1,4 +1,4 @@
-from src.agent import answer_question
+from src.agent import answer_question_with_trace
 
 
 def main() -> None:
@@ -19,10 +19,15 @@ def main() -> None:
             continue
 
         try:
-            answer = answer_question(user_input)
+            answer, trace_steps = answer_question_with_trace(user_input)
         except Exception as error:
             print(f"Error: {error}")
             continue
+
+        print()
+        print("Reasoning / tool trace:")
+        for step_number, step in enumerate(trace_steps, start=1):
+            print(f"\n[{step_number}] {step}")
 
         print()
         print("Agent:")
