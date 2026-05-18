@@ -137,6 +137,23 @@ def get_intents_by_category(category: str) -> list[str]:
     return sorted(filtered_df["intent"].unique().tolist())
 
 
+def get_category_intent_map() -> dict[str, list[str]]:
+    """Return a mapping of each category to its intents."""
+    df = get_dataset()
+
+    category_intent_map = (
+        df.groupby("category")["intent"]
+        .unique()
+        .apply(lambda values: sorted(values.tolist()))
+        .to_dict()
+    )
+
+    return {
+        category: intents
+        for category, intents in sorted(category_intent_map.items())
+    }
+
+
 def filter_dataset(
     category: str | None = None,
     intent: str | None = None,
@@ -269,6 +286,16 @@ DATASET_TOOLS = [
             "Use this when the user asks what intents are included in a category."
         ),
         args_schema=CategoryInput,
+    ),
+        StructuredTool.from_function(
+        func=get_category_intent_map,
+        name="get_category_intent_map",
+        description=(
+            "Return a mapping of every dataset category to the intents inside it. "
+            "Use this when the user asks to describe, list, compare, or explain "
+            "the intents in each category."
+        ),
+        args_schema=EmptyInput,
     ),
     StructuredTool.from_function(
         func=count_rows,
