@@ -141,15 +141,3 @@ def route_query(query: str) -> RouteResult:
 
     return parse_router_response(content)
 
-
-if __name__ == "__main__":
-    test_queries = [
-        "What categories exist in the dataset?",
-        "Summarize the FEEDBACK category.",
-        "Who is the president of France?",
-    ]
-
-    for test_query in test_queries:
-        print("=" * 80)
-        print(test_query)
-        print(route_query(test_query))
