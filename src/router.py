@@ -49,6 +49,7 @@ Examples:
 - Where did this dataset come from?
 - Is this dataset real customer data?
 - What columns does the dataset have?
+- Show me examples from banana category.
 
 2. unstructured
 Use this for open-ended analysis or summarization questions about the Bitext customer service dataset.
@@ -69,6 +70,7 @@ Examples:
 Important rules:
 - Questions about the dataset source, origin, columns, structure, limitations, or whether it contains real customer data are in scope and should be classified as structured.
 - The agent can only answer questions about the dataset.
+- If the user asks for dataset examples, counts, categories, intents, or distributions using an invalid or unknown category/intent name, classify it as structured. The agent/tools should handle the invalid label.
 - Do not answer the user's question.
 - Do not use general knowledge.
 - Only classify the query.
