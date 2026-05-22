@@ -1,8 +1,11 @@
 from typing import Any
 import pandas as pd
+
 from langchain_core.tools import StructuredTool
 from pydantic import BaseModel, Field
+
 from src.data_loader import load_dataset_from_csv
+from src.query_understanding import understand_dataset_query
 
 class EmptyInput(BaseModel):
     """Input schema for tools that do not require parameters."""
@@ -443,29 +446,35 @@ def build_search_plan(query: str) -> SearchPlan:
 
 
 def search_examples(query: str, n: int = 5) -> list[dict[str, Any]]:
-    """Search examples using natural-language terms and dataset label hints."""
+    """Search examples using LLM query understanding plus text-search fallback."""
     df = get_dataset()
     normalized_query = query.strip().lower()
 
     if not normalized_query:
         raise ValueError("Search query cannot be empty.")
 
+    query_understanding = understand_dataset_query(normalized_query)
     search_plan = build_search_plan(normalized_query)
-    sample_columns = ["instruction", "category", "intent", "response"]
 
+    sample_columns = ["instruction", "category", "intent", "response"]
     result_parts: list[pd.DataFrame] = []
 
-    # Most specific matches first: exact intent hints.
+    if query_understanding.intent:
+        intent_matches = df[df["intent"] == query_understanding.intent]
+        result_parts.append(intent_matches)
+
+    if query_understanding.category:
+        category_matches = df[df["category"] == query_understanding.category]
+        result_parts.append(category_matches)
+
     if search_plan.preferred_intents:
         intent_matches = df[df["intent"].isin(search_plan.preferred_intents)]
         result_parts.append(intent_matches)
 
-    # Then broader category matches.
     if search_plan.preferred_category:
         category_matches = df[df["category"] == search_plan.preferred_category]
         result_parts.append(category_matches)
 
-    # Then natural-language text matches in instruction/response only.
     keyword_mask = pd.Series(False, index=df.index)
 
     for term in search_plan.text_terms:
