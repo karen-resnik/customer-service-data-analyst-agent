@@ -134,18 +134,6 @@ Run with persistent memory:
 
 Using the same session ID later restores the conversation state and user profile memory.
 
-Example:
-
-    python main.py --session demo
-
-Then ask:
-
-    Show me 3 examples from REFUND.
-    Show me 2 more.
-    Can you summarize this category?
-    My name is Karen and I mostly care about payment issues.
-    What do you remember about me?
-
 ## Memory
 
 This project implements two types of memory.
@@ -178,11 +166,6 @@ It can remember things like:
 - explicit interests
 - answer style preferences
 - topics the user repeatedly asks about
-
-Example:
-
-    My name is Karen and I mostly care about payment issues.
-    What do you remember about me?
 
 ## Dataset tools
 
