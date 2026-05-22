@@ -59,6 +59,11 @@ class ShowExamplesInput(BaseModel):
         le=10,
         description="Number of examples to return. Must be between 1 and 10.",
     )
+    offset: int = Field(
+        default=0,
+        ge=0,
+        description="Number of matching examples to skip before returning results.",
+    )
 
 
 class SearchExamplesInput(BaseModel):
@@ -75,6 +80,12 @@ class SearchExamplesInput(BaseModel):
         le=10,
         description="Number of matching examples to return. Must be between 1 and 10.",
     )
+    offset: int = Field(
+        default=0,
+        ge=0,
+        description="Number of matching examples to skip before returning results.",
+    )
+    
 
 class SearchPlan(BaseModel):
     """Internal search plan for natural-language example search."""
@@ -215,10 +226,10 @@ def filter_dataset(
 
     return df
 
-def get_sample_records(df: pd.DataFrame, n: int = 5) -> list[dict[str, Any]]:
+def get_sample_records(df: pd.DataFrame, n: int = 5, offset: int = 0,) -> list[dict[str, Any]]:
     """Return compact sample records from a DataFrame."""
     sample_columns = ["instruction", "category", "intent", "response"]
-    sample_df = df[sample_columns].head(n)
+    sample_df = df[sample_columns].iloc[offset : offset + n]
     return sample_df.to_dict(orient="records")
 
 
@@ -235,10 +246,11 @@ def show_examples(
     category: str | None = None,
     intent: str | None = None,
     n: int = 3,
+    offset: int = 0,
 ) -> list[dict[str, Any]]:
     """Return example customer instructions and responses from the dataset."""
     filtered_df = filter_dataset(category=category, intent=intent)
-    return get_sample_records(filtered_df, n=n)
+    return get_sample_records(filtered_df, n=n, offset=offset)
 
 
 def get_intent_distribution(category: str) -> dict[str, int]:
@@ -470,7 +482,7 @@ def build_search_plan(query: str) -> SearchPlan:
     )
 
 
-def search_examples(query: str, n: int = 5) -> list[dict[str, Any]]:
+def search_examples(query: str, n: int = 5, offset: int = 0) -> list[dict[str, Any]]:
     """Search examples using LLM query understanding plus text-search fallback."""
     df = get_dataset()
     normalized_query = query.strip().lower()
@@ -512,9 +524,11 @@ def search_examples(query: str, n: int = 5) -> list[dict[str, Any]]:
     result_parts.append(df.loc[keyword_mask])
 
     matched_df = pd.concat(result_parts)
-    matched_df = matched_df.drop_duplicates().head(n)
+    matched_df = matched_df.drop_duplicates()
 
-    return matched_df[sample_columns].to_dict(orient="records")
+    examples = matched_df[sample_columns].iloc[offset : offset + n]
+
+    return examples.to_dict(orient="records")
 
 
 def get_category_overview(category: str) -> dict[str, Any]:
@@ -643,7 +657,7 @@ DATASET_TOOLS = [
         description=(
             "Show example customer instructions and agent responses, optionally filtered "
             "by category and/or intent. Use this when the user asks for examples from "
-            "a known category or intent."
+            "a known category or intent. Use offset to skip already-shown examples when the user asks for more examples."
         ),
         args_schema=ShowExamplesInput,
     ),
@@ -664,7 +678,7 @@ DATASET_TOOLS = [
             "keyword or phrase. This tool expands common phrases such as money back, complaint, "
             "cancellation, or shipping address into relevant dataset categories or intents internally. "
             "Use this when the user describes an idea in natural language instead of naming an exact "
-            "category or intent."
+            "category or intent. Use offset to skip already-shown examples when the user asks for more examples."
         ),
         args_schema=SearchExamplesInput,
     ),

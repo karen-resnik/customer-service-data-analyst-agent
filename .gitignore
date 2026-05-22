@@ -20,3 +20,6 @@ data/*.parquet
 *.sqlite
 *.sqlite3
 *.db
+
+# Memory
+memory/

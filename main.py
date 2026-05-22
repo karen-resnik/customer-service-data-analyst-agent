@@ -1,4 +1,18 @@
+import argparse
+
 from src.agent import answer_question_with_trace
+
+def parse_args() -> argparse.Namespace:
+    """Parse CLI arguments."""
+    parser = argparse.ArgumentParser(
+        description="Customer Service Data Analyst Agent CLI"
+    )
+    parser.add_argument(
+        "--session",
+        default="default",
+        help="Session ID used for persistent conversation memory.",
+    )
+    return parser.parse_args()
 
 def format_error_message(error: Exception) -> str:
     """Convert internal exceptions into user-friendly CLI messages."""
@@ -37,8 +51,12 @@ def format_error_message(error: Exception) -> str:
 
 def main() -> None:
     """Run an interactive CLI for the customer service data analyst agent."""
+    args = parse_args()
+    session_id = args.session
+    
     print("Customer Service Data Analyst Agent")
     print("Ask questions about the Bitext customer service dataset.")
+    print(f"Session: {session_id}")
     print("Type 'exit' or 'quit' to stop.")
     print()
 
@@ -53,7 +71,7 @@ def main() -> None:
             continue
 
         try:
-            answer, trace_steps = answer_question_with_trace(user_input)
+            answer, trace_steps = answer_question_with_trace(user_input, session_id=session_id,)
         except Exception as error:
             print()
             print("Agent:")

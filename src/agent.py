@@ -1,18 +1,23 @@
 import os
-from typing import Any
-
 import json
+import sqlite3
+
+from typing import Any
+from pathlib import Path
 from dotenv import load_dotenv
+
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from langchain_openai import ChatOpenAI
 from langgraph.prebuilt import create_react_agent
+from langgraph.checkpoint.sqlite import SqliteSaver
+
 from src.router import QueryType, route_query
 from src.tools import DATASET_TOOLS
 
 
 NEBIUS_BASE_URL = "https://api.tokenfactory.nebius.com/v1/"
 AGENT_MODEL = "Qwen/Qwen3-30B-A3B-Instruct-2507"
-
+CHECKPOINT_DB_PATH = Path("memory/checkpoints.sqlite")
 
 AGENT_SYSTEM_PROMPT = """
 You are a customer service data analyst agent.
@@ -38,6 +43,11 @@ Rules:
 - If no matching dataset evidence is found after retrying, clearly say that no matching examples were found in the dataset.
 - Only show examples that appear in tool results. Never create synthetic examples.
 - Keep answers clear and concise.
+- When the user asks for "more", "next", "another", or "additional" examples, use the previous category, intent, or search query from the conversation history.
+- For follow-up requests asking for more examples, call the same example tool again with an offset equal to the number of examples already shown for that same category, intent, or search query.
+- If the previous request showed 2 examples and the user asks for 2 more, use offset=2.
+- If the previous request showed 3 examples and the user asks for 3 more, use offset=3.
+- Do not claim that there are no more examples unless you call the relevant example tool with an increased offset and it returns an empty list.
 """.strip()
 
 def question_asks_for_examples(question: str) -> bool:
@@ -81,17 +91,22 @@ def create_chat_model() -> ChatOpenAI:
 
 
 def create_agent() -> Any:
-    """Create and return the LangGraph ReAct agent."""
+    """Create and return the LangGraph ReAct agent with persistent checkpoints."""
     model = create_chat_model()
+
+    CHECKPOINT_DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    connection = sqlite3.connect(str(CHECKPOINT_DB_PATH), check_same_thread=False)
+    checkpointer = SqliteSaver(connection)
 
     return create_react_agent(
         model=model,
         tools=DATASET_TOOLS,
         prompt=AGENT_SYSTEM_PROMPT,
+        checkpointer=checkpointer,
     )
 
 
-def run_agent_once(question: str) -> str:
+def run_agent_once(question: str, session_id: str = "default") -> str:
     """Run the agent once and return the final response text."""
     agent = create_agent()
 
@@ -103,13 +118,16 @@ def run_agent_once(question: str) -> str:
         },
         config={
             "recursion_limit": 10,
+            "configurable": {
+                "thread_id": session_id,
+            },
         },
     )
 
     final_message = result["messages"][-1]
     return str(final_message.content)
 
-def run_agent_with_trace(question: str) -> tuple[str, list[str]]:
+def run_agent_with_trace(question: str, session_id: str = "default") -> tuple[str, list[str]]:
     """Run the agent and return the final answer plus tool-call trace steps."""
     agent = create_agent()
     trace_steps: list[str] = []
@@ -125,6 +143,9 @@ def run_agent_with_trace(question: str) -> tuple[str, list[str]]:
         },
         config={
             "recursion_limit": 10,
+            "configurable": {
+                "thread_id": session_id,
+            },
         },
         stream_mode="values",
     ):
@@ -164,7 +185,7 @@ def run_agent_with_trace(question: str) -> tuple[str, list[str]]:
     return final_answer, trace_steps
 
 
-def answer_question(question: str) -> str:
+def answer_question(question: str, session_id: str = "default") -> str:
     """Route a question and answer it with the agent when it is in scope."""
     route_result = route_query(question)
 
@@ -174,10 +195,10 @@ def answer_question(question: str) -> str:
             f"Router reason: {route_result.reason}"
         )
 
-    return run_agent_once(question)
+    return run_agent_once(question, session_id=session_id)
 
 
-def answer_question_with_trace(question: str) -> tuple[str, list[str]]:
+def answer_question_with_trace(question: str, session_id: str = "default") -> tuple[str, list[str]]:
     """Route a question and answer it, returning the final answer and trace steps."""
     route_result = route_query(question)
 
@@ -192,7 +213,7 @@ def answer_question_with_trace(question: str) -> tuple[str, list[str]]:
         )
         return answer, trace_steps
 
-    answer, agent_trace_steps = run_agent_with_trace(question)
+    answer, agent_trace_steps = run_agent_with_trace(question, session_id=session_id,)
     trace_steps.extend(agent_trace_steps)
 
     return answer, trace_steps
