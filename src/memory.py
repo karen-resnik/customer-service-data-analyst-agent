@@ -85,6 +85,8 @@ Rules:
 - Use interests only when the user explicitly says they care about, are interested in, prefer, focus on, or mostly work with a topic.
 - Use asked_about_topics for the topic of the current user question.
 - For asked_about_topics, use short phrases such as "refund examples", "payment issues", "dataset metadata", "conversation memory", "tool debugging", or "CLI testing".
+- For asked_about_topics, return at most one primary topic for the current user message.
+- The primary topic should describe what the user mainly asked about, not every related detail mentioned in the assistant answer.
 - Do not store temporary task details, one-off shell commands, raw code, secrets, API keys, file paths, or private credentials.
 - Only set name if the user explicitly states their name or preferred name.
 - Use short, clean phrases for interests, preferences, asked_about_topics, and notes.
@@ -251,7 +253,7 @@ def update_user_profile_from_message(
     
     topics_seen_in_this_message: set[str] = set()
 
-    for topic in profile_update.asked_about_topics:
+    for topic in profile_update.asked_about_topics[:1]:
         normalized_topic = topic.strip()
 
         if not normalized_topic:
