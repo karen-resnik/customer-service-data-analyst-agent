@@ -146,11 +146,36 @@ def validate_intent(intent: str) -> str:
 
     return normalized_intent
 
+def resolve_category(category: str) -> str:
+    """Resolve a user-provided category using exact validation, then LLM mapping."""
+    try:
+        return validate_category(category)
+    except ValueError:
+        understanding = understand_dataset_query(category)
+
+        if understanding.category is None:
+            raise
+
+        return validate_category(understanding.category)
+
+
+def resolve_intent(intent: str) -> str:
+    """Resolve a user-provided intent using exact validation, then LLM mapping."""
+    try:
+        return validate_intent(intent)
+    except ValueError:
+        understanding = understand_dataset_query(intent)
+
+        if understanding.intent is None:
+            raise
+
+        return validate_intent(understanding.intent)
+
 
 def get_intents_by_category(category: str) -> list[str]:
     """Return all intents that belong to a specific category."""
     df = get_dataset()
-    valid_category = validate_category(category)
+    valid_category = resolve_category(category)
 
     filtered_df = df[df["category"] == valid_category]
     return sorted(filtered_df["intent"].unique().tolist())
@@ -181,11 +206,11 @@ def filter_dataset(
     df = get_dataset()
 
     if category is not None:
-        valid_category = validate_category(category)
+        valid_category = resolve_category(category)
         df = df[df["category"] == valid_category]
 
     if intent is not None:
-        valid_intent = validate_intent(intent)
+        valid_intent = resolve_intent(intent)
         df = df[df["intent"] == valid_intent]
 
     return df
