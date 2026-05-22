@@ -46,6 +46,9 @@ Examples:
 - Show me 3 examples from the SHIPPING category.
 - What is the distribution of intents in the ACCOUNT category?
 - Show me examples of people wanting their money back.
+- Where did this dataset come from?
+- Is this dataset real customer data?
+- What columns does the dataset have?
 
 2. unstructured
 Use this for open-ended analysis or summarization questions about the Bitext customer service dataset.
@@ -64,6 +67,7 @@ Examples:
 - What is the best CRM software?
 
 Important rules:
+- Questions about the dataset source, origin, columns, structure, limitations, or whether it contains real customer data are in scope and should be classified as structured.
 - The agent can only answer questions about the dataset.
 - Do not answer the user's question.
 - Do not use general knowledge.

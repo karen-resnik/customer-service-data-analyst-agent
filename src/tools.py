@@ -549,6 +549,45 @@ def get_intent_overview(intent: str) -> dict[str, Any]:
         "sample_records": get_sample_records(filtered_df, n=5),
     }
 
+def get_dataset_metadata() -> dict[str, Any]:
+    """Return metadata and important notes about the Bitext dataset."""
+    df = get_dataset()
+
+    return {
+        "name": "Bitext Customer Service Tagged Training Dataset",
+        "source": "Bitext",
+        "hugging_face_dataset": "bitext/Bitext-customer-support-llm-chatbot-training-dataset",
+        "description": (
+            "A customer service training dataset containing customer instructions, "
+            "high-level categories, specific intents, and example assistant responses."
+        ),
+        "data_type_note": (
+            "The dataset is intended for training and evaluating customer-service chatbots. "
+            "It uses templated placeholders such as {{Order Number}}, {{Website URL}}, "
+            "{{Customer Support Phone Number}}, and {{Person Name}} instead of direct customer identifiers. "
+            "Based on these placeholders and the training purpose, it appears to be synthetic or de-identified "
+            "rather than raw production customer conversations."
+        ),
+        "rows": int(len(df)),
+        "columns": df.columns.tolist(),
+        "column_descriptions": {
+            "flags": "Text variation or generation tags.",
+            "instruction": "Customer message or request.",
+            "category": "High-level customer service topic.",
+            "intent": "Specific customer service intent.",
+            "response": "Example assistant response.",
+        },
+        "category_count": int(df["category"].nunique()),
+        "intent_count": int(df["intent"].nunique()),
+        "categories": list_categories(),
+        "intents": list_intents(),
+        "limitations": [
+            "The dataset may not reflect real production customer conversations.",
+            "Some examples contain typos, informal language, or synthetic placeholders.",
+            "The responses are examples and should not be treated as official policy.",
+            "The dataset should be inspected before drawing business conclusions.",
+        ],
+    }
 
 DATASET_TOOLS = [
     StructuredTool.from_function(
@@ -647,5 +686,16 @@ DATASET_TOOLS = [
             "and sample records. Use this for summarizing or analyzing a specific intent."
         ),
         args_schema=IntentInput,
+    ),
+    StructuredTool.from_function(
+        func=get_dataset_metadata,
+        name="get_dataset_metadata",
+        description=(
+            "Return metadata about the Bitext customer service dataset, including source, "
+            "row count, columns, category and intent counts, data type notes, and limitations. "
+            "Use this for questions about where the dataset comes from, whether it is real "
+            "customer data, what columns it has, or dataset limitations."
+        ),
+        args_schema=EmptyInput,
     ),
 ]
