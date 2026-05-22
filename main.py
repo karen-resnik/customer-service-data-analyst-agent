@@ -1,6 +1,12 @@
 import argparse
 
 from src.agent import answer_question_with_trace
+from src.memory import (
+    load_user_profile,
+    profile_to_text,
+    update_user_profile_from_message,
+    user_asks_about_memory,
+)
 
 def parse_args() -> argparse.Namespace:
     """Parse CLI arguments."""
@@ -70,8 +76,19 @@ def main() -> None:
         if not user_input:
             continue
 
+        if user_asks_about_memory(user_input):
+            profile = load_user_profile(session_id)
+
+            print()
+            print("Agent:")
+            print(profile_to_text(profile))
+            print()
+
+            continue
+
         try:
             answer, trace_steps = answer_question_with_trace(user_input, session_id=session_id,)
+            update_user_profile_from_message(session_id=session_id, user_message=user_input, agent_answer=answer)
         except Exception as error:
             print()
             print("Agent:")
