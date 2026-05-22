@@ -1,6 +1,7 @@
 import os
 from typing import Any
 
+import json
 from dotenv import load_dotenv
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from langchain_openai import ChatOpenAI
@@ -32,10 +33,34 @@ Rules:
 - If the question is unrelated to the dataset, say that you can only answer questions about the Bitext customer service dataset.
 - For counts, distributions, categories, intents, and examples, always use tools.
 - For summaries, use tools first to gather evidence, then summarize based on the tool results.
-- If a tool returns an empty list, empty dictionary, or no matching rows, do not fabricate examples or counts. Try a broader or alternative dataset tool. If no matching dataset evidence is found, clearly say that no matching examples were found.
+- If a tool returns an empty list [], do not invent examples, counts, categories, intents, or responses.
+- If a tool returns no matching examples, try one more relevant tool call with a broader query or a more likely category/intent.
+- If no matching dataset evidence is found after retrying, clearly say that no matching examples were found in the dataset.
+- Only show examples that appear in tool results. Never create synthetic examples.
 - Keep answers clear and concise.
 """.strip()
 
+def question_asks_for_examples(question: str) -> bool:
+    """Return True if the user is asking for dataset examples."""
+    normalized_question = question.lower()
+    example_terms = {
+        "example",
+        "examples",
+        "show me",
+        "give me",
+        "find examples",
+    }
+    return any(term in normalized_question for term in example_terms)
+
+
+def tool_result_is_empty_list(content: str) -> bool:
+    """Return True if a tool message content represents an empty list."""
+    try:
+        parsed_content = json.loads(content)
+    except json.JSONDecodeError:
+        return content.strip() == "[]"
+
+    return parsed_content == []
 
 def create_chat_model() -> ChatOpenAI:
     """Create the Nebius-backed chat model used by the agent."""
@@ -89,6 +114,8 @@ def run_agent_with_trace(question: str) -> tuple[str, list[str]]:
     agent = create_agent()
     trace_steps: list[str] = []
     final_answer = ""
+    example_tool_was_called = False
+    example_tool_found_results = False
 
     for step in agent.stream(
         {
@@ -117,6 +144,21 @@ def run_agent_with_trace(question: str) -> tuple[str, list[str]]:
             trace_steps.append(
                 f"Tool result from {latest_message.name}:\n"
                 f"{latest_message.content}"
+            )
+            if latest_message.name in {"search_examples", "show_examples"}:
+                example_tool_was_called = True
+
+                if not tool_result_is_empty_list(str(latest_message.content)):
+                    example_tool_found_results = True
+        
+        if (
+            question_asks_for_examples(question)
+            and example_tool_was_called
+            and not example_tool_found_results
+        ):
+            final_answer = (
+                "I couldn't find matching examples in the dataset for that request. "
+                "Try using a broader phrase, or ask for examples from a known category or intent."
             )
 
     return final_answer, trace_steps
