@@ -1,4 +1,3 @@
-cat > README.md <<'EOF'
 # Customer Service Data Analyst Agent
 
 A CLI-based data analyst agent for the Bitext customer service dataset.
@@ -305,4 +304,3 @@ The following runtime/local files are ignored by git:
     __pycache__/
 
 Do not commit API keys, local memory databases, or downloaded dataset files.
-EOF
