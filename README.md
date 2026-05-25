@@ -243,8 +243,17 @@ Expected output includes:
     SHIPPING
     SUBSCRIPTION
 
-The client uses this FastMCP config:
+## Connect to the MCP server from your own client
 
+A grader or developer can also connect directly with a minimal FastMCP client. Save the snippet below as a Python file, for example `tmp_mcp_client.py`, and run it from the project root.
+
+```python
+import asyncio
+
+from fastmcp import Client
+
+
+async def main() -> None:
     config = {
         "mcpServers": {
             "customer-service-data-analyst-agent": {
@@ -253,6 +262,21 @@ The client uses this FastMCP config:
             }
         }
     }
+
+    async with Client(config) as client:
+        result = await client.call_tool("mcp_list_categories", {})
+        print(result)
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+Run it:
+
+    python tmp_mcp_client.py
+
+This client launches the MCP server over stdio, calls `mcp_list_categories`, and prints the dataset categories.
 
 ## Development checks
 
